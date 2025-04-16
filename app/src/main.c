@@ -50,17 +50,18 @@
  #include "drv_io.h"
  #include "stdio.h"
  #include "string.h"
- 
- 
+
+
  extern void xiaozhi_ui_update_ble(char *string);
  extern void xiaozhi_ui_update_emoji(char *string);
  extern void xiaozhi_ui_chat_status(char *string);
  extern void xiaozhi_ui_chat_output(char *string);
- 
+
  extern void xiaozhi_ui_task(void *args);
  extern void xiaozhi(int argc, char **argv);
  extern void xiaozhi2(int argc, char **argv);
  extern void reconnect_websocket();
+ #if !SOLUTION_WATCH
  /* Common functions for RT-Thread based platform -----------------------------------------------*/
  /**
    * @brief  Initialize board default configuration.
@@ -72,20 +73,21 @@
      //__asm("B .");        /*For debugging purpose*/
      BSP_IO_Init();
  }
+ #endif
  /* User code start from here --------------------------------------------------------*/
  #include "bts2_app_inc.h"
  #include "ble_connection_manager.h"
  #include "bt_connection_manager.h"
- 
+
  #include "ulog.h"
- 
+
  #define BT_APP_READY 0
  #define BT_APP_CONNECT_PAN  1
  #define BT_APP_CONNECT_PAN_SUCCESS 2
  #define WEBSOCKET_RECONNECT 3
- 
+
  #define PAN_TIMER_MS        3000
- 
+
  typedef struct
  {
      BOOL bt_connected;
@@ -102,8 +104,8 @@ BOOL g_pan_connected = FALSE;
          rt_mb_send(g_bt_app_mb, BT_APP_CONNECT_PAN);
      return;
  }
- 
- 
+
+#if SOLUTION_WATCH != 1
  #if defined(BSP_USING_SPI_NAND) && defined(RT_USING_DFS)
  #include "dfs_file.h"
  #include "dfs_posix.h"
@@ -136,14 +138,15 @@ BOOL g_pan_connected = FALSE;
  }
  INIT_ENV_EXPORT(mnt_init);
  #endif
- 
- 
+ #endif
+
+
  static int bt_app_interface_event_handle(uint16_t type, uint16_t event_id, uint8_t *data, uint16_t data_len)
  {
      if (type == BT_NOTIFY_COMMON)
      {
          int pan_conn = 0;
- 
+
          switch (event_id)
          {
          case BT_NOTIFY_COMMON_BT_STACK_READY:
@@ -159,7 +162,7 @@ BOOL g_pan_connected = FALSE;
                        info->mac.addr[1], info->mac.addr[0], info->res);
                  g_bt_app_env.bt_connected = FALSE;
                  memset(&g_bt_app_env.bd_addr, 0xFF, sizeof(g_bt_app_env.bd_addr));
- 
+
                  if (g_bt_app_env.pan_connect_timer)
                      rt_timer_stop(g_bt_app_env.pan_connect_timer);
              }
@@ -186,7 +189,7 @@ BOOL g_pan_connected = FALSE;
          default:
              break;
          }
- 
+
          if (pan_conn)
          {
              LOG_I("bd addr 0x%.2x:%.2x:%.2x:%.2x:%.2x:%.2x\n", g_bt_app_env.bd_addr.addr[5],
@@ -218,7 +221,7 @@ BOOL g_pan_connected = FALSE;
                  }
                  rt_mb_send(g_bt_app_mb, BT_APP_CONNECT_PAN_SUCCESS);
                  g_pan_connected = TRUE;  // 更新PAN连接状态
- 
+
              }
              break;
          case BT_NOTIFY_PAN_PROFILE_DISCONNECTED:
@@ -234,17 +237,17 @@ BOOL g_pan_connected = FALSE;
              break;
          }
      }
- 
- 
+
+
      return 0;
  }
- 
+
  uint32_t bt_get_class_of_device()
  {
     return (uint32_t)BT_SRVCLS_NETWORK | BT_DEVCLS_PERIPHERAL | BT_PERIPHERAL_REMCONTROL;
  }
- 
- 
+
+
  /**
    * @brief  Main program
    * @param  None
@@ -255,45 +258,54 @@ BOOL g_pan_connected = FALSE;
  #else
      static const char *local_name = "sifli-pan";
  #endif
- 
+
+ #if SOLUTION_WATCH
+ void xiaozhi_service_task(void *args)
+ #else
  int main(void)
+ #endif
  {
+#if !SOLUTION_WATCH
      //Create  xiaozhi UI
      rt_thread_t tid = rt_thread_create("xz_ui", xiaozhi_ui_task, NULL, 4096, 30, 10);
      rt_thread_startup(tid);
- 
- 
+#endif
+
      //Connect BT PAN
      g_bt_app_mb = rt_mb_create("bt_app", 8, RT_IPC_FLAG_FIFO);
  #ifdef BSP_BT_CONNECTION_MANAGER
      bt_cm_set_profile_target(BT_CM_PAN, BT_SLAVE_ROLE, 1);
  #endif // BSP_BT_CONNECTION_MANAGER
- 
+
      bt_interface_register_bt_event_notify_callback(bt_app_interface_event_handle);
- 
+#if SOLUTION_WATCH != 1 //solution ble default enabled.
      sifli_ble_enable();
+#endif
      while (1)
      {
          uint32_t value;
- 
+
          // handle pan connect event
          rt_mb_recv(g_bt_app_mb, (rt_uint32_t *)&value, RT_WAITING_FOREVER);
- 
+#if SOLUTION_WATCH
+        rt_kprintf("%s get value %d\n", __FUNCTION__, value);
+#endif
          if (value == BT_APP_CONNECT_PAN)
          {
              if (g_bt_app_env.bt_connected)
              {
-                 bt_interface_conn_ext((char *)&g_bt_app_env.bd_addr, BT_PROFILE_PAN);
+                 bt_interface_conn_ext((unsigned char *)&g_bt_app_env.bd_addr, BT_PROFILE_PAN);
              }
- 
+
          }
          else if (value == BT_APP_READY)
          {
              LOG_I("BT/BLE stack and profile ready");
- 
- 
+
+#if !SOLUTION_WATCH
              // Update Bluetooth name
              bt_interface_set_local_name(strlen(local_name), (void *)local_name);
+#endif
          }
          else if (value == BT_APP_CONNECT_PAN_SUCCESS)
          {
@@ -302,27 +314,29 @@ BOOL g_pan_connected = FALSE;
              xiaozhi_ui_update_ble("open");
              xiaozhi_ui_chat_status("正在连接xiaozhi...");
              xiaozhi_ui_update_emoji("neutral");
- 
+
              rt_thread_mdelay(2000);
              xiaozhi2(0, NULL); //Start Xiaozhi
          }
          else if (value == WEBSOCKET_RECONNECT)
          {
- 
+
              rt_kputs("WEBSOCKET_RECONNECT\r\n");
               reconnect_websocket();//重连websocket
-             
+
          }
          else{
              rt_kputs("WEBSOCKET_DISCONNECT\r\n");
              xiaozhi_ui_chat_output("请重启");
          }
- 
+
      }
+#if !SOLUTION_WATCH
      return 0;
+#endif
  }
- 
- 
+
+
  static void pan_cmd(int argc, char **argv)
  {
      if (strcmp(argv[1], "del_bond") == 0)
@@ -337,6 +351,16 @@ BOOL g_pan_connected = FALSE;
          bt_app_connect_pan_timeout_handle(NULL);
  }
  MSH_CMD_EXPORT(pan_cmd, Connect PAN to last paired device);
- 
- 
- 
+
+ #if SOLUTION_WATCH
+extern struct rt_semaphore update_ui_sema;
+ int xiaozhi_service_init(void)
+ {
+    rt_sem_init(&update_ui_sema, "update_ui", 1, RT_IPC_FLAG_FIFO);
+
+    rt_thread_t tid = rt_thread_create("xz_srv", xiaozhi_service_task, NULL, 4096, RT_THREAD_PRIORITY_LOW, 20);
+    rt_thread_startup(tid);
+    return 0;
+ }
+ INIT_APP_EXPORT(xiaozhi_service_init);
+ #endif
