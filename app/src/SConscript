@@ -4,6 +4,6 @@ from building import *
 # Add source code
 src = Glob('*.c')
 SrcRemove(src, 'xiaozhi.c')
-group = DefineGroup('Applications', src, depend = [''])
+group = DefineGroup('Applications', src, depend = ['PKG_USING_XIAOZHI'])
 
 Return('group')

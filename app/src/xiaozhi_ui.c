@@ -2,7 +2,13 @@
 #include "bf0_hal.h"
 #include "drv_io.h"
 #include "littlevgl2rtt.h"
+#if SOLUTION_WATCH
+#include "global.h"
+#define _MODULE_NAME_ "xiaozhi"
+#include "app_module.h"
+#else   //solution use lvgl v7
 #include "lv_tiny_ttf.h"
+#endif
 #include "string.h"
 
 #include "bf0_pm.h"
@@ -15,6 +21,9 @@
 #define IDLE_TIME_LIMIT  (30000)
 #define LCD_DEVICE_NAME  "lcd"
 
+#if SOLUTION_WATCH
+struct rt_semaphore update_ui_sema;
+#else
 static struct rt_semaphore update_ui_sema;
 /*Create style with the new font*/
 static lv_style_t style;
@@ -46,6 +55,7 @@ extern const lv_image_dsc_t confused;
 
 extern const lv_image_dsc_t ble;//ble
 extern const lv_image_dsc_t ble_close;
+#endif
 
 static lv_obj_t *global_label1;
 static lv_obj_t *global_label2;
@@ -57,6 +67,13 @@ static lv_obj_t *global_img;
 static lv_obj_t *global_img_ble;
 
 
+#if SOLUTION_WATCH
+typedef struct
+{
+    lv_obj_t              *bg_page;
+    rt_list_t             *list;
+} app_xiaozhi_t;
+#endif
 
 void set_position_by_percentage(lv_obj_t * obj, int x_percent, int y_percent) {
     // Gets the width and height of the screen resolution
@@ -71,8 +88,22 @@ void set_position_by_percentage(lv_obj_t * obj, int x_percent, int y_percent) {
     lv_obj_set_pos(obj, target_x, target_y);
 }
 
+#if SOLUTION_WATCH
+rt_err_t xiaozhi_ui_obj_init(lv_obj_t *bg_page)
+#else
 rt_err_t xiaozhi_ui_obj_init(void)
+#endif
 {
+#if SOLUTION_WATCH
+    global_img_ble = lv_img_create(parent, NULL);//ble
+    lv_img_set_src(global_img_ble, ble);
+    lv_obj_align(global_img_ble, parent, LV_ALIGN_TOP_LEFT, 40, 0);
+    
+
+    global_img = lv_img_create(parent, NULL);//emoji
+    lv_img_set_src(global_img, neutral);
+    lv_obj_align(global_img, parent, LV_ALIGN_CENTER, 0, -40);
+#else
     LV_IMAGE_DECLARE(neutral);
     LV_IMAGE_DECLARE(happy);
     LV_IMAGE_DECLARE(laughing);
@@ -106,8 +137,15 @@ rt_err_t xiaozhi_ui_obj_init(void)
     global_img = lv_img_create(lv_screen_active());//emoji
     lv_img_set_src(global_img, &neutral);
     lv_obj_align(global_img, LV_ALIGN_CENTER, 0, -40);
+#endif
     
-    
+#if SOLUTION_WATCH
+    global_label1 = lv_label_create(bg_page, NULL);//top text
+    lv_label_set_long_mode(global_label1, LV_LABEL_LONG_SROLL_CIRC);
+    lv_obj_set_width(global_label1, 150);
+    lv_label_set_align(global_label1, LV_LABEL_ALIGN_CENTER);
+    lv_obj_align(global_label1, bg_page, LV_ALIGN_IN_TOP_MID, 0, 0);
+#else
     global_label1 = lv_label_create(lv_screen_active());//top text
 
     lv_label_set_long_mode(global_label1, LV_LABEL_LONG_SCROLL_CIRCULAR); 
@@ -115,8 +153,15 @@ rt_err_t xiaozhi_ui_obj_init(void)
     lv_obj_set_width(global_label1, 150);
     lv_obj_set_style_text_align(global_label1,LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_align(global_label1, LV_ALIGN_TOP_MID, 0, 0);
-    
+#endif
 
+#if SOLUTION_WATCH
+    global_label2 = lv_label_create(bg_page, NULL);
+    lv_label_set_long_mode(global_label2, LV_LABEL_LONG_BREAK);
+    lv_obj_set_width(global_label2, LV_HOR_RES_MAX);
+    lv_label_set_align(global_label2, LV_LABEL_ALIGN_CENTER);
+    lv_obj_align(global_label2, global_img, LV_ALIGN_OUT_BOTTOM_MID, 0, 0);
+#else
     global_label2 = lv_label_create(lv_screen_active());//output text
 
     lv_label_set_long_mode(global_label2, LV_LABEL_LONG_WRAP);  /*Break the long lines*/
@@ -293,6 +338,7 @@ void xiaozhi_ui_task(void *args)
 
     rt_sem_init(&update_ui_sema, "update_ui", 1, RT_IPC_FLAG_FIFO);
 
+#if !SOLUTION_WATCH
     /* init littlevGL */
     ret = littlevgl2rtt_init("lcd");
     if (ret != RT_EOK)
@@ -379,10 +425,71 @@ void xiaozhi_ui_task(void *args)
         }
 
     }
+#endif
 
 }
 
+#if SOLUTION_WATCH
+static app_xiaozhi_t *p_xiaozhi = NULL;
+static void on_start(void)
+{
+    p_xiaozhi = (app_xiaozhi_t *)APP_GET_PAGE_MEM_PTR;
+    lv_obj_t *cont = lv_basecont_parent_create(lv_scr_act());
 
+    lv_obj_t *title = lvsf_title_create(cont, NULL);
+    lvsf_title_set_text(title, app_get_str(key_xiaozhi, "Xiaozhi"));
+    lvsf_title_set_visible_item(title, LVSF_TITLE_TITLE | LVSF_TITLE_TIME);
 
+    lv_obj_t *bg_page = lvsf_page_create(cont, NULL);
+    lvsf_page_set_scrollbar_mode(bg_page, LV_SCROLLBAR_MODE_OFF);
+    lvsf_page_set_size(bg_page, lv_disp_get_hor_res(NULL), lv_disp_get_ver_res(NULL) - lv_obj_get_height(title) - lv_obj_get_y(title));
+    lvsf_page_set_align(bg_page, title, LV_ALIGN_OUT_BOTTOM_MID, 0, 0);
+    lvsf_page_set_status(bg_page, PAGE_STATE_STARTED);
+    p_xiaozhi->bg_page = bg_page;
+    xiaozhi_ui_obj_init(p_xiaozhi->bg_page);
+    lvsf_page_set_defult_pos(p_xiaozhi->bg_page);
 
+    xiaozhi_ui_update_ble("close");
+    xiaozhi_ui_chat_status("connecting...");
+    xiaozhi_ui_chat_output("Ready...");
+    xiaozhi_ui_update_emoji("neutral");
+}
 
+static void on_resume(void)
+{
+    RT_ASSERT(p_xiaozhi);
+    if (PAGE_STATE_STARTED != lvsf_page_get_status(p_xiaozhi->bg_page))
+    {
+        lv_page_clean(p_xiaozhi->bg_page);
+        xiaozhi_ui_obj_init(p_xiaozhi->bg_page);
+        lvsf_page_set_defult_pos(p_xiaozhi->bg_page);
+        xiaozhi_ui_update_ble("close");
+        xiaozhi_ui_chat_status("connecting...");
+        xiaozhi_ui_chat_output("Ready...");
+        xiaozhi_ui_update_emoji("neutral");
+    }
+    lvsf_page_set_drag_dir(p_xiaozhi->bg_page, DRAG_DIR_VER);
+    lvsf_page_set_focus_enable(p_xiaozhi->bg_page, true);
+    lvsf_page_focus_entry(p_xiaozhi->bg_page);
+    lvsf_page_set_scrlbar_enable(p_xiaozhi->bg_page, true);
+    lvsf_page_set_status(p_xiaozhi->bg_page, PAGE_STATE_RESUMED);
+}
+
+static void on_pause(void)
+{
+    RT_ASSERT(p_xiaozhi);
+    lvsf_page_set_focus_disable(p_xiaozhi->bg_page);
+    lvsf_page_set_scrlbar_enable(p_xiaozhi->bg_page, false);
+    lvsf_page_set_status(p_xiaozhi->bg_page, PAGE_STATE_PAUSED);
+}
+
+static void on_stop(void)
+{
+    RT_ASSERT(p_xiaozhi);
+    p_xiaozhi = NULL;
+}
+
+APP_MSG_HANDLER_REGISTER(on_start, on_resume, on_pause, on_stop);
+APPLICATION_REGISTER(app_get_strid(key_xiaozhi, "Xiaozhi"), img_siri,
+                     "Xiaozhi", sizeof(app_xiaozhi_t));
+#endif

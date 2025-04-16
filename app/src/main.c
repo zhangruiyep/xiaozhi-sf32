@@ -65,6 +65,7 @@
  extern void xiaozhi2(int argc, char **argv);
  extern void reconnect_websocket();
  extern xiaozhi_ws_t g_xz_ws;   
+ #if !SOLUTION_WATCH
  /* Common functions for RT-Thread based platform -----------------------------------------------*/
  /**
    * @brief  Initialize board default configuration.
@@ -76,6 +77,7 @@
      //__asm("B .");        /*For debugging purpose*/
      BSP_IO_Init();
  }
+ #endif
  /* User code start from here --------------------------------------------------------*/
  #include "bts2_app_inc.h"
  #include "ble_connection_manager.h"
@@ -107,7 +109,7 @@ int first_reconnect_attempts = 0;
      return;
  }
  
- 
+#if !SOLUTION_WATCH
  #if defined(BSP_USING_SPI_NAND) && defined(RT_USING_DFS)
  #include "dfs_file.h"
  #include "dfs_posix.h"
@@ -189,6 +191,7 @@ static void xz_button_init2(void)
         initialized = 1;
     }
 }
+#endif
 void keep_First_pan_connection()
 {
     static int first_reconnect_attempts = 0;
@@ -426,8 +429,13 @@ void keep_First_pan_connection()
  
 
  
+ #if SOLUTION_WATCH
+ void xiaozhi_service_task(void *args)
+ #else
  int main(void)
+ #endif
  {
+#if !SOLUTION_WATCH
     xz_button_init2();
     #ifdef BSP_USING_BOARD_YELLOW_MOUNTAIN
     unsigned int *addr2 = (unsigned int *)0x50003088;   //21
@@ -446,7 +454,7 @@ void keep_First_pan_connection()
     //Create  xiaozhi UI  
     rt_thread_t tid = rt_thread_create("xz_ui", xiaozhi_ui_task, NULL, 4096, 30, 10);
     rt_thread_startup(tid);
-
+#endif
     
      //Connect BT PAN
      g_bt_app_mb = rt_mb_create("bt_app", 8, RT_IPC_FLAG_FIFO);
@@ -455,8 +463,9 @@ void keep_First_pan_connection()
  #endif // BSP_BT_CONNECTION_MANAGER
  
      bt_interface_register_bt_event_notify_callback(bt_app_interface_event_handle);
- 
+#if SOLUTION_WATCH != 1 //solution ble default enabled.
      sifli_ble_enable();
+#endif
      while (1)
      {
        
@@ -464,7 +473,9 @@ void keep_First_pan_connection()
  
          // handle pan connect event
          rt_mb_recv(g_bt_app_mb, (rt_uint32_t *)&value, RT_WAITING_FOREVER);
- 
+#if SOLUTION_WATCH
+        rt_kprintf("%s get value %d\n", __FUNCTION__, value);
+#endif
          if (value == BT_APP_CONNECT_PAN)
          {
              if (g_bt_app_env.bt_connected)
@@ -478,8 +489,10 @@ void keep_First_pan_connection()
              LOG_I("BT/BLE stack and profile ready");
  
  
+#if !SOLUTION_WATCH
              // Update Bluetooth name
              bt_interface_set_local_name(strlen(local_name), (void *)local_name);
+#endif
          }
          else if (value == BT_APP_CONNECT_PAN_SUCCESS)
          {
@@ -528,7 +541,9 @@ void keep_First_pan_connection()
          }
  
      }
+#if !SOLUTION_WATCH
      return 0;
+#endif
  }
  
  
@@ -549,3 +564,15 @@ void keep_First_pan_connection()
  
  
  
+ #if SOLUTION_WATCH
+extern struct rt_semaphore update_ui_sema;
+ int xiaozhi_service_init(void)
+ {
+    rt_sem_init(&update_ui_sema, "update_ui", 1, RT_IPC_FLAG_FIFO);
+
+    rt_thread_t tid = rt_thread_create("xz_srv", xiaozhi_service_task, NULL, 4096, RT_THREAD_PRIORITY_LOW, 20);
+    rt_thread_startup(tid);
+    return 0;
+ }
+ INIT_APP_EXPORT(xiaozhi_service_init);
+ #endif
