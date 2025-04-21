@@ -470,9 +470,15 @@ void xz_ws_audio_init()
     rt_kprintf("exit sniff mode\n");
     bt_interface_exit_sniff_mode((unsigned char*)&g_bt_app_env.bd_addr);//exit sniff mode
     bt_interface_wr_link_policy_setting((unsigned char*)&g_bt_app_env.bd_addr, BT_NOTIFY_LINK_POLICY_ROLE_SWITCH);//close role switch
+#if SOLUTION_WATCH
+    audio_server_set_private_volume(AUDIO_TYPE_LOCAL_MUSIC, 15);//设置音量
+#else
     audio_server_set_private_volume(AUDIO_TYPE_LOCAL_MUSIC, 6);//设置音量
+#endif
     xz_audio_decoder_encoder_open(0);//打开音频解码器和编码器
+#if !SOLUTION_WATCH
     xz_button_init();
+#endif
     
 }
 
