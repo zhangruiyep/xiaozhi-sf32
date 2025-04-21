@@ -463,10 +463,16 @@ static void xz_button_init2(void)
 void xz_ws_audio_init()
 {
     rt_kprintf("xz_audio_init\n");
+#if SOLUTION_WATCH
+    audio_server_set_private_volume(AUDIO_TYPE_LOCAL_MUSIC, 15);//设置音量
+#else
     audio_server_set_private_volume(AUDIO_TYPE_LOCAL_MUSIC, 6);//设置音量
+#endif
     xz_audio_decoder_encoder_open(0);//打开音频解码器和编码器
+#if !SOLUTION_WATCH
     xz_button_init();
     xz_button_init2();
+#endif
 }
 
 
