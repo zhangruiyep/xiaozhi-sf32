@@ -387,6 +387,50 @@ void reconnect_websocket() {
 }
 extern rt_mailbox_t g_bt_app_mb;
 #define WEBSOCKET_RECONNECT 3
+
+#if SOLUTION_WATCH
+void xz_button_event_handler(bool is_press)//Session key
+{
+    if (!g_xz_ws.is_connected)//唤醒  stop ? goodbye
+    {
+        rt_kprintf("please button11 attempting to reconnect WebSocket\n\r\n");
+        xiaozhi_ui_chat_status("请按唤醒键...");
+        xiaozhi_ui_chat_output("请按唤醒键重连！");
+        xiaozhi_ui_update_emoji("embarrassed");
+
+    }
+    else
+    {
+        if (is_press)
+        {
+            rt_kprintf("pressed\r\n");
+            ws_send_listen_start(&g_xz_ws.clnt, (char *)g_xz_ws.session_id, kListeningModeAutoStop);//发送开始监听
+            xiaozhi_ui_chat_status("\u8046\u542c\u4e2d...");
+            xz_mic(1);
+        }
+        else
+        {
+            rt_kprintf("released\r\n");
+            xiaozhi_ui_chat_status("\u5f85\u547d\u4e2d...");
+            ws_send_listen_stop(&g_xz_ws.clnt, (char *)g_xz_ws.session_id);
+            xz_mic(0);
+        }
+    }
+}
+
+void xz_button_event_handler2(void)//Wake up key
+{
+    if (!g_xz_ws.is_connected)//唤醒重连websocket
+    {
+        rt_kprintf("handler2 attempting to reconnect WebSocket\n\r\n");
+        xiaozhi_ui_chat_status("唤醒中...");
+        xiaozhi_ui_chat_output("正在唤醒!");
+        xiaozhi_ui_update_emoji("relaxed");
+        rt_mb_send(g_bt_app_mb, WEBSOCKET_RECONNECT);
+
+    }
+}
+#else
 static void xz_button_event_handler(int32_t pin, button_action_t action)//Session key
 {
     rt_kprintf("button(%d) %d:", pin, action);
@@ -460,6 +504,7 @@ static void xz_button_init(void)//Session key
         initialized = 1;
     }
 }
+#endif
 
 
 

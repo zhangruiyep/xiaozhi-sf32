@@ -431,6 +431,45 @@ void xiaozhi_ui_task(void *args)
 
 #if SOLUTION_WATCH
 static app_xiaozhi_t *p_xiaozhi = NULL;
+
+extern void xz_button_event_handler(bool is_press);
+extern void xz_button_event_handler2(void);
+static int32_t xiaozhi_keypad_handler_cb(lv_key_t key, lv_indev_state_t event)
+{
+    if ((LV_KEY_HOME == key) && (LV_INDEV_STATE_PR == event))
+    {
+        LOG_D("%s home key pressed", __func__);
+        xz_button_event_handler2();
+    }
+    else if (LV_KEY_NEXT == key)
+    {
+        //ingore long press time
+        if (event != LV_INDEV_STATE_REL)
+        {
+            event = LV_INDEV_STATE_PR;
+        }
+
+        static lv_indev_state_t last_state = LV_INDEV_STATE_REL;
+        if (last_state == event)
+        {
+            return LV_BLOCK_EVENT;
+        }
+        last_state = event;
+        LOG_D("%s last=%d", __func__, last_state);
+
+        if (LV_INDEV_STATE_REL == event)
+        {
+            LOG_D("%s next key released", __func__);
+            xz_button_event_handler(false);
+        }
+        else
+        {
+            LOG_D("%s next key pressed", __func__);
+            xz_button_event_handler(true);
+        }
+    }
+    return LV_BLOCK_EVENT;
+}
 static void on_start(void)
 {
     p_xiaozhi = (app_xiaozhi_t *)APP_GET_PAGE_MEM_PTR;
@@ -438,7 +477,8 @@ static void on_start(void)
 
     lv_obj_t *title = lvsf_title_create(cont, NULL);
     lvsf_title_set_text(title, app_get_str(key_xiaozhi, "Xiaozhi"));
-    lvsf_title_set_visible_item(title, LVSF_TITLE_TITLE | LVSF_TITLE_TIME);
+    lvsf_title_bottom_set_icons(title, APP_GET_IMG_FROM_APP(symbol, img_title_backspace));
+    lvsf_title_set_visible_item(title, LVSF_TITLE_TITLE | LVSF_TITLE_TIME | LVSF_TITLE_BACK_BTN | LVSF_TITLE_BACK_BTN_ICONS);
 
     lv_obj_t *bg_page = lvsf_page_create(cont, NULL);
     lvsf_page_set_scrollbar_mode(bg_page, LV_SCROLLBAR_MODE_OFF);
@@ -449,6 +489,8 @@ static void on_start(void)
     xiaozhi_ui_obj_init(p_xiaozhi->bg_page);
     lvsf_page_set_defult_pos(p_xiaozhi->bg_page);
 
+    keypad_handler_register(xiaozhi_keypad_handler_cb);
+
     xiaozhi_ui_update_ble("close");
     xiaozhi_ui_chat_status("connecting...");
     xiaozhi_ui_chat_output("Ready...");
@@ -457,6 +499,7 @@ static void on_start(void)
 
 static void on_resume(void)
 {
+    app_disable_screen_lock_time();
     RT_ASSERT(p_xiaozhi);
     if (PAGE_STATE_STARTED != lvsf_page_get_status(p_xiaozhi->bg_page))
     {
@@ -481,10 +524,12 @@ static void on_pause(void)
     lvsf_page_set_focus_disable(p_xiaozhi->bg_page);
     lvsf_page_set_scrlbar_enable(p_xiaozhi->bg_page, false);
     lvsf_page_set_status(p_xiaozhi->bg_page, PAGE_STATE_PAUSED);
+    app_enable_screen_lock_time();
 }
 
 static void on_stop(void)
 {
+    keypad_handler_register(NULL);
     RT_ASSERT(p_xiaozhi);
     p_xiaozhi = NULL;
 }
