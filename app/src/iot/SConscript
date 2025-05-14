@@ -6,8 +6,7 @@ objs = []
 list = os.listdir(cwd)
 
 objs = Glob('*.c')
-SrcRemove(objs, 'xiaozhi.c')
-group = DefineGroup('solution_application', objs, depend = ['PKG_USING_XIAOZHI'], CPPPATH = [cwd])
+group = DefineGroup('solution_application', objs, depend = ['USING_XIAOZHI_IOT'], CPPPATH = [cwd])
 #include all subfolder
 for d in list:
     path = os.path.join(cwd, d)
