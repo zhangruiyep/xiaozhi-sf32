@@ -57,6 +57,9 @@
 #include "button.h"
 #include "audio_server.h"
 #include <webclient.h>
+#if USING_XIAOZHI_IOT
+#include "thing_manager.h"
+#endif
 
 #define MAX_WSOCK_HDR_LEN 512
 extern void xiaozhi_ui_update_ble(char *string);
@@ -80,6 +83,10 @@ xiaozhi_ws_t g_xz_ws;
 char mac_address_string[20];
 char client_id_string[40];
 enum DeviceState g_state;
+#if USING_XIAOZHI_IOT
+enum DeviceState g_last_state;
+static IOT_ThingManager* xz_thing_manager = NULL;
+#endif
 static char message[256];
 char client_id_string[40];
 ALIGN(4) uint8_t g_sha256_result[32] = {0};
@@ -520,6 +527,36 @@ void xz_ws_audio_init()
 #endif
 }
 
+#if USING_XIAOZHI_IOT
+void InitializeIot() {
+    /* thing manager */
+    if (xz_thing_manager == NULL) {
+        rt_kprintf("%s: init\n", __FUNCTION__);
+        xz_thing_manager = IOT_GetThingManager();
+        rt_list_init(&xz_thing_manager->things.list);
+    }
+    rt_kprintf("%s: add thing speaker\n", __FUNCTION__);
+    IOT_ThingManager_AddThing(xz_thing_manager, IOT_CreateThing("Speaker"));
+
+    /* send to server*/
+    if (g_xz_ws.is_connected == 1)
+    {
+        rt_kprintf("%s: prepare json\n", __FUNCTION__);
+        cJSON *root = cJSON_CreateObject();
+        cJSON_AddStringToObject(root, "session_id", (const char *)g_xz_ws.session_id);
+        cJSON_AddStringToObject(root, "type", "iot");
+        cJSON_AddItemToObject(root, "descriptors", IOT_ThingManager_GetDescriptorsJson(xz_thing_manager));
+        char *message = cJSON_PrintUnformatted(root);
+        rt_kprintf(message);
+        rt_kprintf("%s: send json to server\n", __FUNCTION__);
+        wsock_write(&g_xz_ws.clnt, message, strlen(message), OPCODE_TEXT);
+
+        cJSON_Delete(root);
+        cJSON_free(message);
+    }
+}
+#endif
+
 
 static char *my_json_string(cJSON *json, char *key)
 {
@@ -612,12 +649,32 @@ void parse_helLo(const char *data, u16_t len)
         xiaozhi_ui_update_emoji(cJSON_GetObjectItem(root, "emotion")->valuestring);
         xiaozhi_ui_chat_status("\u8bb2\u8bdd\u4e2d...");
     }
-
+#if USING_XIAOZHI_IOT
+    else if (strcmp(type, "iot") == 0)
+    {
+        cJSON *commands = cJSON_GetObjectItem(root, "commands");
+        if (commands)
+        {
+            for (int i = 0; i < cJSON_GetArraySize(commands); ++i) {
+                cJSON *command = cJSON_GetArrayItem(commands, i);
+                IOT_ThingManager_Invoke(xz_thing_manager, command);
+            }
+        }
+    }
+#endif
     else
     {
         rt_kprintf("Unkown type: %s\n", type);
     }
     cJSON_Delete(root);/*每次调用cJSON_Parse函数后，都要释放内存*/
+#if USING_XIAOZHI_IOT
+    if ((g_state == kDeviceStateIdle) && (g_last_state == kDeviceStateUnknown))
+    {
+        rt_kprintf("%s: init iot\n", __func__);
+        InitializeIot();
+    }
+    g_last_state = g_state;
+#endif
 }
 
 static void svr_found_callback(const char *name, const ip_addr_t *ipaddr, void *callback_arg)
