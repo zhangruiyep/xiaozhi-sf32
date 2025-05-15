@@ -139,6 +139,7 @@ rt_err_t xiaozhi_ui_obj_init(void)
     lv_obj_align(global_img, LV_ALIGN_CENTER, 0, -40);
 #endif
     
+    
 #if SOLUTION_WATCH
     global_label1 = lv_label_create(bg_page, NULL);//top text
     lv_label_set_long_mode(global_label1, LV_LABEL_LONG_SROLL_CIRC);
@@ -154,6 +155,7 @@ rt_err_t xiaozhi_ui_obj_init(void)
     lv_obj_set_style_text_align(global_label1,LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_align(global_label1, LV_ALIGN_TOP_MID, 0, 0);
 #endif
+    
 
 #if SOLUTION_WATCH
     global_label2 = lv_label_create(bg_page, NULL);
@@ -170,7 +172,7 @@ rt_err_t xiaozhi_ui_obj_init(void)
     lv_obj_set_style_text_align(global_label2,LV_TEXT_ALIGN_CENTER, 0);
     
     lv_obj_align_to(global_label2, global_img, LV_ALIGN_OUT_BOTTOM_MID, 0, 0);
-
+#endif
    
     return RT_EOK;
 }

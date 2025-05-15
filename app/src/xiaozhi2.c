@@ -240,7 +240,7 @@ void ws_send_listen_start(void *ws, char *session_id, enum ListeningMode mode)
     //rt_kputs("\r\n");
     //rt_kputs(message);
     //rt_kputs("\r\n");
-    if (g_xz_ws.is_connected == 1)
+    if (g_xz_ws.is_connected == 1) 
     {
         wsock_write((wsock_state_t *)ws, message, strlen(message), OPCODE_TEXT);
     }
@@ -248,7 +248,7 @@ void ws_send_listen_start(void *ws, char *session_id, enum ListeningMode mode)
     {
         rt_kprintf("websocket is not connected\n");
     }
-
+    
 }
 
 void ws_send_listen_stop(void *ws, char *session_id)
@@ -314,7 +314,7 @@ err_t my_wsapp_fn(int code, char *buf, size_t len)
         rt_kprintf("WebSocket closed\n");
         g_xz_ws.is_connected = 0;        
 
-
+        
     }
     else if (code == WS_TEXT)
     {
@@ -449,7 +449,7 @@ static void xz_button_event_handler(int32_t pin, button_action_t action)//Sessio
         return;
     }
     last_action=action;
-
+    
     if (!g_xz_ws.is_connected)//唤醒  stop ? goodbye
     {
 #ifdef BSP_USING_PM
@@ -676,6 +676,7 @@ void parse_helLo(const u8_t *data, u16_t len)
         }
     }
 #endif
+    
     else
     {
         rt_kprintf("Unkown type: %s\n", type);

@@ -109,6 +109,7 @@ int first_reconnect_attempts = 0;
      return;
  }
  
+ 
 #if !SOLUTION_WATCH
  #if defined(BSP_USING_SPI_NAND) && defined(RT_USING_DFS)
  #include "dfs_file.h"
@@ -470,7 +471,7 @@ void keep_First_pan_connection()
      {
        
          uint32_t value;
- 
+
          // handle pan connect event
          rt_mb_recv(g_bt_app_mb, (rt_uint32_t *)&value, RT_WAITING_FOREVER);
 #if SOLUTION_WATCH
@@ -480,7 +481,7 @@ void keep_First_pan_connection()
          {
              if (g_bt_app_env.bt_connected)
              {
-                 bt_interface_conn_ext((char *)&g_bt_app_env.bd_addr, BT_PROFILE_PAN);
+                 bt_interface_conn_ext((unsigned char *)&g_bt_app_env.bd_addr, BT_PROFILE_PAN);
              }
  
          }
