@@ -208,7 +208,11 @@ char *get_mac_address()
     return (&(mac_address_string[0]));
 }
 
+#if SOLUTION_WATCH
+void parse_helLo(const char *data, u16_t len);
+#else
 void parse_helLo(const u8_t *data, u16_t len);
+#endif
 
 void ws_send_speak_abort(void *ws, char *session_id, int reason)
 {
@@ -520,8 +524,12 @@ void xz_ws_audio_init()
 {
     rt_kprintf("xz_audio_init\n");
     rt_kprintf("exit sniff mode\n");
+#if SOLUTION_WATCH
+    bt_interface_exit_sniff_mode();//exit sniff mode
+#else
     bt_interface_exit_sniff_mode((unsigned char*)&g_bt_app_env.bd_addr);//exit sniff mode
     bt_interface_wr_link_policy_setting((unsigned char*)&g_bt_app_env.bd_addr, BT_NOTIFY_LINK_POLICY_ROLE_SWITCH);//close role switch
+#endif
 #if SOLUTION_WATCH
     audio_server_set_private_volume(AUDIO_TYPE_LOCAL_MUSIC, 15);//设置音量
 #else
@@ -578,8 +586,15 @@ static char *my_json_string(cJSON *json, char *key)
     return r;
 }
 
+#if SOLUTION_WATCH
+void parse_helLo(const char *data, u16_t len)
+#else
 void parse_helLo(const u8_t *data, u16_t len)
-{          
+#endif
+{
+#if USING_XIAOZHI_IOT
+    bool need_update_state = false;
+#endif
     cJSON *item = NULL;
     cJSON *root = NULL;
     rt_kputs(data);
@@ -674,6 +689,7 @@ void parse_helLo(const u8_t *data, u16_t len)
                 IOT_ThingManager_Invoke(xz_thing_manager, command);
             }
         }
+        need_update_state = true;
     }
 #endif
     
@@ -690,6 +706,20 @@ void parse_helLo(const u8_t *data, u16_t len)
         InitializeIot();
     }
     g_last_state = g_state;
+
+    if (need_update_state)
+    {
+        rt_kprintf("%s: update iot state\n", __func__);
+        bool changed = false;
+        cJSON* states = IOT_ThingManager_GetStatesJson(xz_thing_manager, true, &changed);
+        if (states)
+        {
+            char * message = cJSON_PrintUnformatted(states);
+            wsock_write(&g_xz_ws.clnt, message, strlen(message), OPCODE_TEXT);
+            cJSON_Delete(states);
+            cJSON_free(message);
+        }
+    }
 #endif
 }
 

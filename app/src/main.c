@@ -208,7 +208,7 @@ void keep_First_pan_connection()
         {
             rt_timer_stop(g_bt_app_env.pan_connect_timer);
         }
-        bt_interface_conn_ext((char *)&g_bt_app_env.bd_addr, BT_PROFILE_HID);
+        bt_interface_conn_ext((unsigned char *)&g_bt_app_env.bd_addr, BT_PROFILE_HID);
     }
     else{
         LOG_W("Failed to keep_first_reconnect PAN after %d attempts", max_reconnect_attempts);
@@ -245,7 +245,7 @@ void keep_First_pan_connection()
         {
             rt_timer_stop(g_bt_app_env.pan_connect_timer);
         }
-        bt_interface_conn_ext((char *)&g_bt_app_env.bd_addr, BT_PROFILE_HID);
+        bt_interface_conn_ext((unsigned char *)&g_bt_app_env.bd_addr, BT_PROFILE_HID);
         reconnect_attempts++;
         rt_thread_mdelay(reconnect_interval_ms);
         // 检查是否连接成功
@@ -390,7 +390,7 @@ void keep_First_pan_connection()
                 {
                     rt_timer_stop(g_bt_app_env.pan_connect_timer);
                 }
-                bt_interface_conn_ext((char *)&g_bt_app_env.bd_addr, BT_PROFILE_PAN);
+                bt_interface_conn_ext((unsigned char *)&g_bt_app_env.bd_addr, BT_PROFILE_PAN);
             }
         }
         break;

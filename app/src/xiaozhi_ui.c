@@ -14,10 +14,16 @@
 #include "bf0_pm.h"
 #include "gui_app_pm.h"
 #include "drv_gpio.h"
+#if !SOLUTION_WATCH
 #include "lv_timer.h"
 #include "lv_display.h"
 #include "lv_obj_pos.h"
+#endif
 #include "ulog.h"
+#if SOLUTION_WATCH
+#undef BSP_USING_PM //disable pm apis
+#endif
+
 #define IDLE_TIME_LIMIT  (30000)
 #define LCD_DEVICE_NAME  "lcd"
 
@@ -72,7 +78,13 @@ typedef struct
 {
     lv_obj_t              *bg_page;
     rt_list_t             *list;
+    lv_task_t             *refresh_task;
 } app_xiaozhi_t;
+
+static char chat_status[64];
+static char chat_output[256];
+static char emoji_set[32];
+static char emoji_now[32];
 #endif
 
 void set_position_by_percentage(lv_obj_t * obj, int x_percent, int y_percent) {
@@ -95,14 +107,14 @@ rt_err_t xiaozhi_ui_obj_init(void)
 #endif
 {
 #if SOLUTION_WATCH
-    global_img_ble = lv_img_create(parent, NULL);//ble
-    lv_img_set_src(global_img_ble, ble);
-    lv_obj_align(global_img_ble, parent, LV_ALIGN_TOP_LEFT, 40, 0);
-    
+    global_img_ble = lv_img_create(bg_page, NULL);//ble
+    lv_img_set_src(global_img_ble, APP_GET_IMG(ble));
+    lv_obj_align(global_img_ble, bg_page, LV_ALIGN_IN_TOP_LEFT, 40, 0);
 
-    global_img = lv_img_create(parent, NULL);//emoji
-    lv_img_set_src(global_img, neutral);
-    lv_obj_align(global_img, parent, LV_ALIGN_CENTER, 0, -40);
+
+    global_img = lv_img_create(bg_page, NULL);//emoji
+    lv_img_set_src(global_img, APP_GET_IMG(neutral));
+    lv_obj_align(global_img, bg_page, LV_ALIGN_CENTER, 0, -40);
 #else
     LV_IMAGE_DECLARE(neutral);
     LV_IMAGE_DECLARE(happy);
@@ -183,8 +195,11 @@ void xiaozhi_ui_chat_status(char *string)//top text
 
     if (string)
     {
+#if SOLUTION_WATCH
+        strncpy(chat_status, string, sizeof(chat_status));
+#else
         lv_label_set_text(global_label1, string);
-
+#endif
     }
 
     rt_sem_release(&update_ui_sema);
@@ -196,21 +211,62 @@ void xiaozhi_ui_chat_output(char *string)
 
     if (string)
     {
+#if SOLUTION_WATCH
+        strncpy(chat_output, string, sizeof(chat_output));
+#else
         lv_label_set_text(global_label2, string);
 #ifdef BSP_USING_PM
         lv_display_trigger_activity(NULL);
 #endif // BSP_USING_PM
+#endif
     }
 
     rt_sem_release(&update_ui_sema);
 }
 
+#if SOLUTION_WATCH
+typedef struct
+{
+    const char *img_string;
+    const void *src_img;
+} emoji_t;
+
+#define XZ_EMOJI_ITEM(x) {#x, APP_GET_IMG(x)}
+
+static emoji_t emoji_list[] =
+{
+    XZ_EMOJI_ITEM(neutral),
+    XZ_EMOJI_ITEM(happy),
+    XZ_EMOJI_ITEM(laughing),
+    XZ_EMOJI_ITEM(funny),
+    XZ_EMOJI_ITEM(sad),
+    XZ_EMOJI_ITEM(angry),
+    XZ_EMOJI_ITEM(crying),
+    XZ_EMOJI_ITEM(loving),
+    XZ_EMOJI_ITEM(embarrassed),
+    XZ_EMOJI_ITEM(surprised),
+    XZ_EMOJI_ITEM(shocked),
+    XZ_EMOJI_ITEM(thinking),
+    XZ_EMOJI_ITEM(winking),
+    XZ_EMOJI_ITEM(cool),
+    XZ_EMOJI_ITEM(relaxed),
+    XZ_EMOJI_ITEM(delicious),
+    XZ_EMOJI_ITEM(kissy),
+    XZ_EMOJI_ITEM(confident),
+    XZ_EMOJI_ITEM(sleepy),
+    XZ_EMOJI_ITEM(silly),
+    XZ_EMOJI_ITEM(confused),
+};
+#endif
 
 void xiaozhi_ui_update_emoji(char *string)//emoji
 {
     
     rt_sem_take(&update_ui_sema, RT_WAITING_FOREVER);
 
+#if SOLUTION_WATCH
+    strncpy(emoji_set, string, sizeof(emoji_set));
+#else
     if (string) {
         if (strcmp(string, "neutral") == 0) {
             lv_img_set_src(global_img, &neutral);
@@ -258,7 +314,7 @@ void xiaozhi_ui_update_emoji(char *string)//emoji
             lv_img_set_src(global_img, &neutral); // common emoji is neutral
         }
     }
-    
+#endif
 
     rt_sem_release(&update_ui_sema);
 }
@@ -271,18 +327,26 @@ void xiaozhi_ui_update_ble(char *string)//ble
     {
         if(strcmp(string,"open") == 0)
         {
+#if SOLUTION_WATCH
+            lv_img_set_src(global_img_ble, APP_GET_IMG(ble));
+#else
             lv_img_set_src(global_img_ble, &ble);
+#endif
         }
         else if(strcmp(string,"close") == 0)
         {
+#if SOLUTION_WATCH
+            lv_img_set_src(global_img_ble, APP_GET_IMG(ble_close));
+#else
             lv_img_set_src(global_img_ble, &ble_close);
+#endif
         }
     }
 
     rt_sem_release(&update_ui_sema);
 }
 
-
+#ifdef BSP_USING_PM
 static rt_device_t lcd_device;
 static void pm_event_handler(gui_pm_event_type_t event)
 {
@@ -330,7 +394,7 @@ void pm_ui_init()
     gui_pm_init(lcd_device, pm_event_handler);
 
 }
-
+#endif
 
 void xiaozhi_ui_task(void *args)
 {
@@ -472,6 +536,38 @@ static int32_t xiaozhi_keypad_handler_cb(lv_key_t key, lv_indev_state_t event)
     }
     return LV_BLOCK_EVENT;
 }
+
+void xiaozhi_page_refresh(lv_task_t *task)
+{
+    if (strcmp(lv_label_get_text(global_label1), chat_status) != 0)
+    {
+        lv_label_set_text(global_label1, chat_status);
+    }
+
+    if (strcmp(lv_label_get_text(global_label2), chat_output) != 0)
+    {
+        lv_label_set_text(global_label2, chat_output);
+    }
+
+    if (strcmp(emoji_set, emoji_now) != 0)
+    {
+        int i = 0;
+        for (i = 0; i < sizeof(emoji_list)/sizeof(emoji_list[0]); i++)
+        {
+            if (strcmp(emoji_set, emoji_list[i].img_string) == 0) {
+                lv_img_set_src(global_img, emoji_list[i].src_img);
+                break;
+            }
+        }
+        /* default */
+        if (i >= sizeof(emoji_list)/sizeof(emoji_list[0]))
+        {
+            lv_img_set_src(global_img, emoji_list[0].src_img);
+        }
+        strcpy(emoji_now, emoji_set);
+    }
+}
+
 static void on_start(void)
 {
     p_xiaozhi = (app_xiaozhi_t *)APP_GET_PAGE_MEM_PTR;
@@ -486,6 +582,7 @@ static void on_start(void)
     lvsf_page_set_scrollbar_mode(bg_page, LV_SCROLLBAR_MODE_OFF);
     lvsf_page_set_size(bg_page, lv_disp_get_hor_res(NULL), lv_disp_get_ver_res(NULL) - lv_obj_get_height(title) - lv_obj_get_y(title));
     lvsf_page_set_align(bg_page, title, LV_ALIGN_OUT_BOTTOM_MID, 0, 0);
+    lv_ext_set_local_bg(bg_page, LV_COLOR_WHITE, LV_OPA_COVER);
     lvsf_page_set_status(bg_page, PAGE_STATE_STARTED);
     p_xiaozhi->bg_page = bg_page;
     xiaozhi_ui_obj_init(p_xiaozhi->bg_page);
@@ -518,6 +615,12 @@ static void on_resume(void)
     lvsf_page_focus_entry(p_xiaozhi->bg_page);
     lvsf_page_set_scrlbar_enable(p_xiaozhi->bg_page, true);
     lvsf_page_set_status(p_xiaozhi->bg_page, PAGE_STATE_RESUMED);
+    /* refresh task */
+    if (NULL == p_xiaozhi->refresh_task)
+    {
+        p_xiaozhi->refresh_task = lv_task_create(xiaozhi_page_refresh, APP_REFRESH_PERIOD, LV_TASK_PRIO_LOW, (void *)0);
+    }
+    xiaozhi_page_refresh(NULL);
 }
 
 static void on_pause(void)
@@ -527,6 +630,11 @@ static void on_pause(void)
     lvsf_page_set_scrlbar_enable(p_xiaozhi->bg_page, false);
     lvsf_page_set_status(p_xiaozhi->bg_page, PAGE_STATE_PAUSED);
     app_enable_screen_lock_time();
+    if (p_xiaozhi->refresh_task)
+    {
+        lv_task_del(p_xiaozhi->refresh_task);
+        p_xiaozhi->refresh_task = NULL;
+    }
 }
 
 static void on_stop(void)
