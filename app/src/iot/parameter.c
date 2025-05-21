@@ -9,6 +9,7 @@ void IOT_Parameter_Init(IOT_Parameter *parameter, const char *name, const char *
     parameter->description = description;
     parameter->type = type;
     parameter->required = required;
+    parameter->value = NULL;
 }
 
 cJSON * IOT_Parameter_GetDescriptorJson(IOT_Parameter *param) {

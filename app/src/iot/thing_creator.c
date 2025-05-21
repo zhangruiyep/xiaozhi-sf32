@@ -4,9 +4,11 @@
 #include "thing_creator.h"
 
 extern IOT_Thing* Speaker_creator(void);
+extern IOT_Thing* PhoneCall_creator(void);
 
 ThingCreator thing_creators[] = {
     {"Speaker", Speaker_creator},
+    {"PhoneCall", PhoneCall_creator},
 };
 
 IOT_Thing* IOT_CreateThing(const char* type) {

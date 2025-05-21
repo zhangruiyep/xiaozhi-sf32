@@ -400,6 +400,7 @@ extern rt_mailbox_t g_bt_app_mb;
 #define WEBSOCKET_RECONNECT 3
 
 #if SOLUTION_WATCH
+#define PAN_RECONNECT 4
 void xz_button_event_handler(bool is_press)//Session key
 {
     if (!g_xz_ws.is_connected)//唤醒  stop ? goodbye
@@ -434,11 +435,10 @@ void xz_button_event_handler2(void)//Wake up key
     if (!g_xz_ws.is_connected)//唤醒重连websocket
     {
         rt_kprintf("handler2 attempting to reconnect WebSocket\n\r\n");
-        xiaozhi_ui_chat_status("唤醒中...");
-        xiaozhi_ui_chat_output("正在唤醒!");
-        xiaozhi_ui_update_emoji("relaxed");
-        rt_mb_send(g_bt_app_mb, WEBSOCKET_RECONNECT);
-
+        //xiaozhi_ui_chat_status("唤醒中...");
+        //xiaozhi_ui_chat_output("正在唤醒!");
+        //xiaozhi_ui_update_emoji("relaxed");
+        rt_mb_send(g_bt_app_mb, PAN_RECONNECT);//连接pan,如果连接成功就会触发BT_NOTIFY_PAN_PROFILE_CONNECTED事件
     }
 }
 #else
@@ -552,6 +552,8 @@ void InitializeIot() {
     }
     rt_kprintf("%s: add thing speaker\n", __FUNCTION__);
     IOT_ThingManager_AddThing(xz_thing_manager, IOT_CreateThing("Speaker"));
+    rt_kprintf("%s: add thing phone call\n", __FUNCTION__);
+    IOT_ThingManager_AddThing(xz_thing_manager, IOT_CreateThing("PhoneCall"));
 
     /* send to server*/
     if (g_xz_ws.is_connected == 1)
